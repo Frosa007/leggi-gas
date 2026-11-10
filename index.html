@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html lang="it"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>P3 · Gay-Lussac e Charles</title>
+<style>
+:root{--bg:#fff;--fg:#1a1a1a;--mu:#666;--bd:#d0d0d0;--ac:#1857b6;--cd:#f5f5f5;--ok:#0a7d34;--ko:#b3261e}
+@media(prefers-color-scheme:dark){:root{--bg:#161616;--fg:#eee;--mu:#999;--bd:#3a3a3a;--ac:#6ea8ff;--cd:#222;--ok:#5ad38a;--ko:#ff8a80}}
+body{margin:0;font:14px system-ui,sans-serif;background:var(--bg);color:var(--fg)}
+header{padding:8px 12px;border-bottom:1px solid var(--bd)}h1{font-size:16px;margin:0}
+nav{display:flex;flex-wrap:wrap;gap:4px;padding:6px 12px;border-bottom:1px solid var(--bd)}
+nav button{padding:5px 10px}button.on{background:var(--ac);color:var(--bg)}
+main{padding:12px;max-width:1100px;margin:auto}section{display:none}section.on{display:block}
+button,input,textarea,select{font:inherit;color:var(--fg);background:var(--cd);border:1px solid var(--bd);border-radius:4px;padding:3px 6px}
+textarea{width:100%;box-sizing:border-box;font-family:monospace}input{width:90px}input.w{width:100%;box-sizing:border-box}
+table{border-collapse:collapse;margin:6px 0}td,th{border:1px solid var(--bd);padding:3px 6px;text-align:right}th{background:var(--cd)}td:first-child,th:first-child{text-align:left}
+.sc{overflow-x:auto}.card{border:1px solid var(--bd);border-radius:6px;padding:8px;margin:8px 0}
+pre{background:var(--cd);padding:8px;white-space:pre-wrap;border-radius:4px}.ok{color:var(--ok)}.ko{color:var(--ko)}.mu{color:var(--mu)}
+h2{font-size:15px}h3{font-size:14px;margin:10px 0 4px}canvas{border:1px solid var(--bd);width:100%;max-width:420px}
+</style></head><body>
+<header><h1>P3 · Leggi di Gay-Lussac e Charles — calcolo in laboratorio</h1></header>
+<nav id="nav"></nav><main id="m"></main>
+<script>
+const $=s=>document.querySelector(s);
+const DEF={post:'1-20',grp:'GRUPPO B-24: Filippo Rosa, Joseph Sassolini, Giovanni Stella, Giulio Vertucci',
+q:[{id:'p0',n:'Pressione assoluta iniziale',u:'kPa',res:0.1,vals:'',exp:'',sexp:''},
+{id:'T0',n:'Temperatura iniziale',u:'°C',res:0.05,vals:'',exp:'',sexp:''},
+{id:'V0',n:'Volume totale gas (cilindri+tubi)',u:'cm3',res:1,vals:'',exp:'',sexp:''}],
+runs:[{name:'GL-1',type:'GL',txt:'',a:1,b:99999,sx:0.05,sy:0.005},{name:'CH-1',type:'CH',txt:'',a:1,b:99999,sx:0.05,sy:0.1}],
+F:{kGL:'p0/(T0+273.15)',kCh:'V0/(T0+273.15)',sB:'r/Math.sqrt(12)',T0e:'y0/m-273.15'}};
+let S;try{S=JSON.parse(localStorage.getItem('p3'))||JSON.parse(JSON.stringify(DEF))}catch(e){S=JSON.parse(JSON.stringify(DEF))}
+const save=()=>{try{localStorage.setItem('p3',JSON.stringify(S))}catch(e){}};
+const nums=s=>String(s).replace(/,/g,'.').split(/[\s;]+/).filter(x=>x!=='').map(Number).filter(isFinite);
+const f=x=>isFinite(x)?String(+x.toPrecision(4)):'–';
+const fu=(v,s)=>{if(!isFinite(v)||!isFinite(s)||s<=0)return f(v);const d=Math.max(0,1-Math.floor(Math.log10(s)));return v.toFixed(Math.min(d,15))+' ± '+s.toFixed(Math.min(d,15))};
+const zz=(a,sa,b,sb)=>Math.abs(a-b)/Math.hypot(sa,sb);
+const ev=(ex,v)=>{try{return new Function(...Object.keys(v),'return '+ex)(...Object.values(v))}catch(e){return NaN}};
+function prop(ex,v){const val={},y0=ev(ex,Object.fromEntries(Object.entries(v).map(([k,a])=>[k,a[0]]))),h={};let s2=0;
+for(const k in v){const [x,s]=v[k];if(!(s>0))continue;const d=1e-6*Math.abs(x)+1e-9,p={},q={};for(const j in v){p[j]=v[j][0];q[j]=v[j][0]}p[k]+=d;q[k]-=d;s2+=((ev(ex,p)-ev(ex,q))/(2*d)*s)**2}return[y0,Math.sqrt(s2)]}
+const sB=r=>ev(S.F.sB,{r});
+function stats(v,r){const n=v.length,m=n?v.reduce((a,b)=>a+b,0)/n:NaN,va=n>1?v.reduce((a,b)=>a+(b-m)**2,0)/(n-1):NaN,s=Math.sqrt(va),sm=s/Math.sqrt(n),b=sB(r);
+return{n,m,va,s,sm,b,st:n>1?Math.hypot(sm,b):b}}
+function fit(x,y,sx,sy){let m=0,b=0,S0,Sx,Sy,Sxx,Sxy,w;for(let it=0;it<8;it++){S0=Sx=Sy=Sxx=Sxy=0;
+for(let i=0;i<x.length;i++){w=1/(sy**2+(m*sx)**2);S0+=w;Sx+=w*x[i];Sy+=w*y[i];Sxx+=w*x[i]**2;Sxy+=w*x[i]*y[i]}
+const D=S0*Sxx-Sx*Sx;m=(S0*Sxy-Sx*Sy)/D;b=(Sy-m*Sx)/S0;var sm=Math.sqrt(S0/D),sb=Math.sqrt(Sxx/D)}
+let c=0;for(let i=0;i<x.length;i++)c+=(y[i]-b-m*x[i])**2/(sy**2+(m*sx)**2);const nd=x.length-2;return{m,sm,b,sb,c,nd,cr:c/nd}}
+const cls=z=>z<3?'ok':'ko';
+function tbl(id,h,rows){return`<div class="sc"><table id="${id}"><tr>${h.map(x=>`<th>${x}</th>`).join('')}</tr>${rows.map(r=>`<tr>${r.map(c=>`<td>${c}</td>`).join('')}</tr>`).join('')}</table></div><button onclick="cp('${id}')">Copia (TSV per Excel)</button>`}
+function cp(id){const t=[...document.querySelectorAll('#'+id+' tr')].map(r=>[...r.children].map(c=>c.innerText.replace(/\./g,'.')).join('\t')).join('\n');navigator.clipboard.writeText(t)}
+function cpt(id){navigator.clipboard.writeText(document.getElementById(id).innerText)}
+const pre=(id,t)=>`<pre id="${id}">${t}</pre><button onclick="cpt('${id}')">Copia</button>`;
+const post=()=>S.post==='1-20'?{p:'CI-6534 bassa pressione (0–10 kPa relativa, ris. 0.005 kPa)',T:'CI-6605 acciaio inox (ris. 0.05 °C)',x:'CI-6538 moto rotatorio (1/1440 di giro), DataStudio'}:{p:'PS-2181 + AirLink PS-3200 (ris. 0.01 kPa)',T:'PS-3201 wireless (ris. 0.01 °C)',x:'PS-2120A (1/4000 di giro), Capstone'};
+const TABS={g:'Guida misure',l:'Logbook',q:'Grandezze (media/varianza)',r:'Fit e confronto',t:'Totali',f:'Formule'};let tab='g';
+function nav(){$('#nav').innerHTML=Object.entries(TABS).map(([k,v])=>`<button class="${k==tab?'on':''}" onclick="tab='${k}';draw()">${v}</button>`).join('')+'<button onclick="exp()">Esporta JSON</button><button onclick="imp()">Importa JSON</button><button onclick="if(confirm(\'Azzerare tutto?\')){S=JSON.parse(JSON.stringify(DEF));save();draw()}">Reset</button>'}
+function exp(){const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([JSON.stringify(S,null,1)],{type:'application/json'}));a.download='p3_dati.json';a.click()}
+function imp(){const i=document.createElement('input');i.type='file';i.onchange=()=>i.files[0].text().then(t=>{S=JSON.parse(t);save();draw()});i.click()}
+function guide(){return`<h2>Prima di cominciare</h2><ul>
+<li>Postazione: <select onchange="S.post=this.value;save();draw()"><option ${S.post=='1-20'?'selected':''}>1-20</option><option ${S.post=='24-30'?'selected':''}>24-30</option></select> (cambia sensori e risoluzioni)</li>
+<li>Da portare in più: portatile con Python/Jupyter, chiavetta USB, cronometro/telefono per foto, termometro di riserva, carta assorbente, panno, nastro adesivo e pennarello, calcolatrice, righello/calibro (diametro puleggia), fogli di riserva.</li>
+<li>Il sensore di T e di p non vanno calibrati. Annotare ora e matricola/etichetta di ogni sensore (foto della targhetta).</li>
+<li>Frequenza di acquisizione uguale per tutti i sensori (es. 10 Hz); cifre significative secondo la risoluzione.</li></ul>
+<h2>Gay-Lussac (V costante)</h2><ol>
+<li>Sensore T nel foro del tappo, sospeso, senza toccare le pareti; sensore p nell'altro foro. Mai togliere il sensore T dal tappo.</li>
+<li>Acqua a T ambiente nel thermos con cilindro e resistenza; acqua a metà altezza del cilindro, mai al tappo.</li>
+<li>Attendere equilibrio, annotare T0 e p0 (se sensore relativo: p0 = p_atm + lettura; leggere p_atm da barometro/stazione).</li>
+<li>Avviare acquisizione e alimentare la resistenza alla massima tensione. La resistenza non va mai tolta dall'acqua se alimentata.</li>
+<li>Scartare i dati iniziali finché T non cresce linearmente. Fermare prima di ebollizione/risalita di acqua nei tubi.</li>
+<li>Ripetere almeno 2 volte (partenza da T0 diverse se possibile); salvare ogni file grezzo senza modificarlo.</li></ol>
+<h2>Charles (p costante)</h2><ol>
+<li>Pistone poco sopra il minimo corsa, collegato con filo alla puleggia del sensore di posizione.</li>
+<li>Pesetti all'altro capo del filo per bilanciare il peso del pistone (nessuna differenza di pressione, meno perdite).</li>
+<li>Collegare il sistema al cilindro metallico con sensore p; misurare il diametro puleggia (ΔV = A·Δx).</li>
+<li>Stessa procedura di riscaldamento; V0 è il volume di tutto il gas (cilindri + tubicini): stimarlo e annotare la sua incertezza (sistematica dominante).</li>
+<li>Verificare che p resti costante durante la misura; ripetere almeno 2 volte.</li></ol>
+<h2>Accorgimenti</h2><ul><li>Tenuta non perfetta: n può variare per tempi lunghi; misure rapide.</li><li>Ritardo di risposta del sensore T rispetto al gas: salita lenta riduce l'effetto.</li><li>Punti campionati a 10 Hz sono correlati: il χ² del fit può risultare molto piccolo; confrontare con σ scalata.</li><li>Non cancellare dati: barrare e annotare il motivo.</li></ul>`}
+function logb(){const P=post();return`<h2>Da incollare nel logbook</h2>`+pre('l1',`Esperienza P3: Studio delle leggi di Gay-Lussac e Charles
+Corso di Termodinamica e Laboratorio
+${S.grp}
+Data: ____   Ora inizio: ____   Postazione: ${S.post}
+
+Scopo
+- studio della legge di Gay-Lussac (Δp/p0 = ΔT/T0, V costante)
+- studio della legge di Charles (ΔV/V0 = ΔT/T0, p costante)
+
+Strumenti / Materiale
+- sensore di pressione: ${P.p} - matricola: ____
+- sensore di temperatura: ${P.T} - matricola: ____
+- sensore di posizione angolare: ${P.x} - matricola: ____
+- sistema pistone-cilindro (pistone in grafite, cilindro in pyrex)
+- cilindro metallico a volume fisso con tappo di plastica
+- due thermos, un termometro, bollitore
+- resistenza e generatore di tensione
+- pesetti (bulloni), filo, puleggia (diametro: ____ )
+Incertezza di tipo B: sigma = risoluzione/sqrt(12)
+
+Tabella dati (una per ogni acquisizione)
+File: ____ (cartella dati/)  Ora: ____  Frequenza: ____ Hz
+T [°C] ± ____ | p [kPa] ± ____ | V [cm3] ± ____
+
+Fattori di influenza: p_atm [kPa] = ____ ; T ambiente [°C] = ____
+
+Operazioni
+- ore ____ : verifica strumenti, risoluzioni
+- ore ____ : Gay-Lussac, serie 1 (file ____)
+- ore ____ : Charles, serie 1 (file ____)`)+`<h3>Formule (da riportare nel logbook)</h3>`+pre('l2',`Gay-Lussac: Δp = (p0/T0)·ΔT   pendenza attesa k = p0/T0
+Charles: ΔV = (V0/T0)·ΔT   pendenza attesa k = V0/T0
+T0 in kelvin = T0[°C] + 273.15
+σB = ris/√12
+Fit pesato: y = b + m·x, σ_eff² = σy² + m²·σx²
+Z = |a − b| / √(σa² + σb²)    χ² = Σ((yi − b − m·xi)/σ_eff,i)²
+File di calcolo: questa app (esportare JSON in analisi/)`)}
+function qpane(){let h='<h2>Grandezze misurate ripetutamente</h2><p class="mu">Valori separati da spazio. Risoluzione e valore atteso modificabili. N=1: misura singola.</p><div class="sc"><table><tr><th>id</th><th>nome</th><th>unità</th><th>ris.</th><th>valori</th><th>atteso</th><th>σ atteso</th><th></th></tr>';
+S.q.forEach((q,i)=>{h+=`<tr><td><input value="${q.id}" onchange="S.q[${i}].id=this.value.replace(/\\W/g,'');save();draw()"></td><td><input class="w" value="${q.n}" onchange="S.q[${i}].n=this.value;save()"></td><td><input value="${q.u}" onchange="S.q[${i}].u=this.value;save()"></td>`+
+['res'].map(k=>`<td><input value="${q.res}" onchange="S.q[${i}].res=+this.value;save();draw()"></td>`).join('')+`<td><input class="w" style="min-width:240px" value="${q.vals}" onchange="S.q[${i}].vals=this.value;save();draw()"></td><td><input value="${q.exp}" onchange="S.q[${i}].exp=this.value;save();draw()"></td><td><input value="${q.sexp}" onchange="S.q[${i}].sexp=this.value;save();draw()"></td><td><button onclick="S.q.splice(${i},1);save();draw()">×</button></td></tr>`});
+h+='</table></div><button onclick="S.q.push({id:\'x\'+S.q.length,n:\'\',u:\'\',res:0.1,vals:\'\',exp:\'\',sexp:\'\'});save();draw()">+ grandezza</button>';
+const rows=S.q.map(q=>{const s=stats(nums(q.vals),q.res),e=q.exp!==''?+q.exp:NaN,se=+q.sexp||0;let z=NaN,c=NaN;
+if(isFinite(e)&&s.n){z=zz(s.m,s.st,e,se);c=nums(q.vals).reduce((a,v)=>a+((v-e)/Math.hypot(s.b,se))**2,0)}
+return[q.id,s.n,f(s.m),f(s.va),f(s.s),f(s.sm),f(s.b),fu(s.m,s.st)+' '+q.u,f(e),`<span class="${cls(z)}">${f(z)}</span>`,f(c)+(isFinite(c)?'/'+s.n:'')]});
+return h+'<h3>Risultati</h3>'+tbl('tq',['id','N','media','varianza','dev.std s','s/√N','σB','risultato','atteso','Z','χ²/ndf'],rows)}
+function vars_(){const v={};S.q.forEach(q=>{const s=stats(nums(q.vals),q.res);if(s.n)v[q.id]=[s.m,s.st]});return v}
+function runs_(){return S.runs.map(r=>{const L=r.txt.split('\n').map(nums).filter(a=>a.length>=2).slice(r.a-1,r.b),x=L.map(a=>a[0]),y=L.map(a=>a[1]);
+const o={r,x,y};if(x.length>2){o.F=fit(x,y,r.sx,r.sy);const v=vars_(),y0n=r.type=='GL'?'p0':'V0',ex=r.type=='GL'?S.F.kGL:S.F.kCh;
+const[k,sk]=prop(ex,v);o.k=k;o.sk=sk;o.z=zz(o.F.m,o.F.sm,k,sk);o.sc=o.F.sm*Math.sqrt(Math.max(o.F.cr,1));
+if(v[y0n]){const p=prop(S.F.T0e,{y0:v[y0n],m:[o.F.m,o.F.sm]});o.T0=p}}return o})}
+function plot(o,i){return`<canvas id="c${i}" width="420" height="220"></canvas>`}
+function drawPlots(R){R.forEach((o,i)=>{const c=document.getElementById('c'+i);if(!c||!o.F)return;const g=c.getContext('2d'),W=420,H=220,dark=matchMedia('(prefers-color-scheme:dark)').matches;g.fillStyle=dark?'#ccc':'#222';g.strokeStyle=g.fillStyle;
+const a=Math.min(...o.x),b=Math.max(...o.x),ya=Math.min(...o.y),yb=Math.max(...o.y),X=v=>30+(v-a)/(b-a||1)*(W-40),Y=v=>H-25-(v-ya)/(yb-ya||1)*(H-40);
+const st=Math.ceil(o.x.length/300);o.x.forEach((v,j)=>{if(j%st==0)g.fillRect(X(v)-1,Y(o.y[j])-1,3,3)});g.strokeStyle='#e33';g.beginPath();g.moveTo(X(a),Y(o.F.b+o.F.m*a));g.lineTo(X(b),Y(o.F.b+o.F.m*b));g.stroke();
+g.fillStyle=dark?'#ccc':'#222';g.fillText(`x: T [°C] ${f(a)}–${f(b)}   y: ${o.r.type=='GL'?'p [kPa]':'V [cm3]'} ${f(ya)}–${f(yb)}`,5,H-5)})}
+function rpane(){let R=runs_();let h='<h2>Fit lineare per ogni acquisizione</h2><p class="mu">Incollare colonne T [°C] e y (p [kPa] per GL, V [cm3] per CH), una riga per punto. Righe da/a per scartare i punti iniziali. Il fit su dati assoluti dà la stessa pendenza di Δy/ΔT.</p>';
+R.forEach((o,i)=>{const r=o.r;h+=`<div class="card"><input value="${r.name}" onchange="S.runs[${i}].name=this.value;save();draw()"> tipo <select onchange="S.runs[${i}].type=this.value;save();draw()"><option value="GL" ${r.type=='GL'?'selected':''}>Gay-Lussac</option><option value="CH" ${r.type=='CH'?'selected':''}>Charles</option></select>
+righe da <input type="number" value="${r.a}" onchange="S.runs[${i}].a=+this.value;save();draw()"> a <input type="number" value="${r.b}" onchange="S.runs[${i}].b=+this.value;save();draw()"> σx(T) <input value="${r.sx}" onchange="S.runs[${i}].sx=+this.value;save();draw()"> σy <input value="${r.sy}" onchange="S.runs[${i}].sy=+this.value;save();draw()"> <button onclick="S.runs.splice(${i},1);save();draw()">× elimina</button>
+<textarea rows="4" onchange="S.runs[${i}].txt=this.value;save();draw()">${r.txt}</textarea>`;
+if(o.F){const u=r.type=='GL'?'kPa/K':'cm3/K';h+=tbl('tr'+i,['grandezza','valore'],[['N punti usati',o.x.length],['pendenza m ['+u+']',fu(o.F.m,o.F.sm)],['intercetta b',fu(o.F.b,o.F.sb)],['χ²',f(o.F.c)],['ndf',o.F.nd],['χ²/ndf',f(o.F.cr)],['σm scalata √χ²rid',fu(o.F.m,o.sc)],['atteso k',fu(o.k,o.sk)],['Z (m vs k)',`<span class="${cls(o.z)}">${f(o.z)}</span>`],['Z con σm scalata',f(zz(o.F.m,o.sc,o.k,o.sk))],['T0 stimata [°C]',o.T0?fu(o.T0[0],o.T0[1]):'–']])+plot(o,i)}
+else h+='<p class="mu">Servono almeno 3 punti.</p>';h+='</div>'});
+return h+'<button onclick="S.runs.push({name:\'RUN-\'+(S.runs.length+1),type:\'GL\',txt:\'\',a:1,b:99999,sx:0.05,sy:0.005});save();draw()">+ acquisizione</button>',R&&setTimeout(()=>drawPlots(R),0),h+''}
+function tpane(){const R=runs_();let h='<h2>Totali e confronti</h2>';
+['GL','CH'].forEach(t=>{const A=R.filter(o=>o.F&&o.r.type==t);h+=`<h3>${t=='GL'?'Gay-Lussac':'Charles'} (${A.length} acquisizioni)</h3>`;if(!A.length){h+='<p class="mu">Nessun dato.</p>';return}
+const w=A.map(o=>1/o.F.sm**2),W=w.reduce((a,b)=>a+b,0),m=A.reduce((a,o,i)=>a+w[i]*o.F.m,0)/W,s=Math.sqrt(1/W),c=A.reduce((a,o,i)=>a+w[i]*(o.F.m-m)**2,0);
+const ms=A.map(o=>o.F.m),n=ms.length,mm=ms.reduce((a,b)=>a+b,0)/n,va=n>1?ms.reduce((a,b)=>a+(b-mm)**2,0)/(n-1):NaN;
+const k=A[0].k,sk=A[0].sk,z=zz(m,s,k,sk);
+h+=tbl('tt'+t,['grandezza','valore'],[['media pesata pendenze',fu(m,s)],['χ² tra acquisizioni / ndf',f(c)+' / '+(n-1)],['Z (media pesata vs atteso)',`<span class="${cls(z)}">${f(z)}</span>`],['media semplice',f(mm)],['varianza (n−1)',f(va)],['dev.std / σ media',f(Math.sqrt(va))+' / '+f(Math.sqrt(va/n))],['atteso k',fu(k,sk)]]);
+if(n>1){const r=[];for(let i=0;i<n;i++)for(let j=i+1;j<n;j++){const zv=zz(A[i].F.m,A[i].F.sm,A[j].F.m,A[j].F.sm);r.push([A[i].r.name+' vs '+A[j].r.name,`<span class="${cls(zv)}">${f(zv)}</span>`])}h+=tbl('tz'+t,['coppia','Z'],r)}});
+return h+'<p class="mu">Z&lt;3 compatibile (verde). Per una grandezza ripetuta usare la scheda “Grandezze”.</p>'}
+function fpane(){const L={kGL:'Pendenza attesa Gay-Lussac (variabili = id grandezze)',kCh:'Pendenza attesa Charles',sB:'Incertezza tipo B (r = risoluzione)',T0e:'T0 stimata da pendenza (y0 = p0 o V0, m = pendenza)'};
+return'<h2>Formule (modificabili, sintassi JavaScript)</h2><p class="mu">σ calcolata per propagazione numerica (derivate parziali) dalle incertezze delle grandezze. Per un valore atteso fisso scrivere un numero.</p>'+Object.keys(L).map(k=>`<p>${L[k]}<br><input class="w" value="${S.F[k]}" onchange="S.F.${k}=this.value;save();draw()"></p>`).join('')+
+'<h3>Formule fisse usate dall’app</h3>'+pre('ff',`Media = Σxi/N          Varianza = Σ(xi−media)²/(N−1)          s = √varianza
+σ media = s/√N          σ totale = √((s/√N)² + σB²)   (N=1: σ = σB)
+Fit pesato: w = 1/(σy² + m²σx²); m = (S·Sxy − Sx·Sy)/(S·Sxx − Sx²); b = (Sy − m·Sx)/S
+σm = √(S/(S·Sxx − Sx²))      σb = √(Sxx/(S·Sxx − Sx²))
+χ² = Σ w·(yi − b − m·xi)²   ndf = N − 2   (grandezze ripetute vs atteso: ndf = N)
+Z = |a − b|/√(σa² + σb²)
+Media pesata: m = Σ(mi/σi²)/Σ(1/σi²), σ = 1/√Σ(1/σi²), χ² = Σ(mi − m)²/σi², ndf = n − 1
+σ scalata = σm·√max(1, χ²/ndf)`)}
+function draw(){nav();const m=$('#m');m.innerHTML={g:guide,l:logb,q:qpane,r:rpane,t:tpane,f:fpane}[tab]()}
+draw();
+</script></body></html>
