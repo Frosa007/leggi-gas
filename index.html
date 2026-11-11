@@ -45,15 +45,14 @@ let c=0;for(let i=0;i<x.length;i++)c+=(y[i]-b-m*x[i])**2/(sy**2+(m*sx)**2);const
 const cls=z=>z<3?'ok':'ko';
 function tbl(id,h,rows){return`<div class="sc"><table id="${id}"><tr>${h.map(x=>`<th>${x}</th>`).join('')}</tr>${rows.map(r=>`<tr>${r.map(c=>`<td>${c}</td>`).join('')}</tr>`).join('')}</table></div><button onclick="cp('${id}')">Copia (TSV per Excel)</button>`}
 function cp(id){const t=[...document.querySelectorAll('#'+id+' tr')].map(r=>[...r.children].map(c=>c.innerText.replace(/\./g,'.')).join('\t')).join('\n');navigator.clipboard.writeText(t)}
-function cpt(id){navigator.clipboard.writeText(document.getElementById(id).innerText)}
+function cpt(id){const e=document.getElementById(id);navigator.clipboard.writeText(e.value!==undefined?e.value:e.innerText)}
 const pre=(id,t)=>`<pre id="${id}">${t}</pre><button onclick="cpt('${id}')">Copia</button>`;
 const post=()=>S.post==='1-20'?{p:'CI-6534 bassa pressione (0–10 kPa relativa, ris. 0.005 kPa)',T:'CI-6605 acciaio inox (ris. 0.05 °C)',x:'CI-6538 moto rotatorio (1/1440 di giro), DataStudio'}:{p:'PS-2181 + AirLink PS-3200 (ris. 0.01 kPa)',T:'PS-3201 wireless (ris. 0.01 °C)',x:'PS-2120A (1/4000 di giro), Capstone'};
-const TABS={g:'Guida misure',l:'Logbook',q:'Grandezze (media/varianza)',r:'Fit e confronto',t:'Totali',f:'Formule'};let tab='g';
+const TABS={g:'Guida misure',l:'Logbook',q:'Grandezze (media/varianza)',r:'Fit e confronto',t:'Totali',s:'Pianificazione e simulazione',f:'Formule'};let tab='g';
 function nav(){$('#nav').innerHTML=Object.entries(TABS).map(([k,v])=>`<button class="${k==tab?'on':''}" onclick="tab='${k}';draw()">${v}</button>`).join('')+'<button onclick="exp()">Esporta JSON</button><button onclick="imp()">Importa JSON</button><button onclick="if(confirm(\'Azzerare tutto?\')){S=JSON.parse(JSON.stringify(DEF));save();draw()}">Reset</button>'}
 function exp(){const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([JSON.stringify(S,null,1)],{type:'application/json'}));a.download='p3_dati.json';a.click()}
 function imp(){const i=document.createElement('input');i.type='file';i.onchange=()=>i.files[0].text().then(t=>{S=JSON.parse(t);save();draw()});i.click()}
-function guide(){return`<h2>Prima di cominciare</h2><ul>
-<li>Postazione: <select onchange="S.post=this.value;save();draw()"><option ${S.post=='1-20'?'selected':''}>1-20</option><option ${S.post=='24-30'?'selected':''}>24-30</option></select> (cambia sensori e risoluzioni)</li>
+function guide0(){return`<h2>Prima di cominciare</h2><ul>
 <li>Da portare in più: portatile con Python/Jupyter, chiavetta USB, cronometro/telefono per foto, termometro di riserva, carta assorbente, panno, nastro adesivo e pennarello, calcolatrice, righello/calibro (diametro puleggia), fogli di riserva.</li>
 <li>Il sensore di T e di p non vanno calibrati. Annotare ora e matricola/etichetta di ogni sensore (foto della targhetta).</li>
 <li>Frequenza di acquisizione uguale per tutti i sensori (es. 10 Hz); cifre significative secondo la risoluzione.</li></ul>
@@ -71,7 +70,7 @@ function guide(){return`<h2>Prima di cominciare</h2><ul>
 <li>Stessa procedura di riscaldamento; V0 è il volume di tutto il gas (cilindri + tubicini): stimarlo e annotare la sua incertezza (sistematica dominante).</li>
 <li>Verificare che p resti costante durante la misura; ripetere almeno 2 volte.</li></ol>
 <h2>Accorgimenti</h2><ul><li>Tenuta non perfetta: n può variare per tempi lunghi; misure rapide.</li><li>Ritardo di risposta del sensore T rispetto al gas: salita lenta riduce l'effetto.</li><li>Punti campionati a 10 Hz sono correlati: il χ² del fit può risultare molto piccolo; confrontare con σ scalata.</li><li>Non cancellare dati: barrare e annotare il motivo.</li></ul>`}
-function logb(){const P=post();return`<h2>Da incollare nel logbook</h2>`+pre('l1',`Esperienza P3: Studio delle leggi di Gay-Lussac e Charles
+function logb(){const P=post();return`<h2>Da incollare nel logbook</h2>`+ed('l1',`Esperienza P3: Studio delle leggi di Gay-Lussac e Charles
 Corso di Termodinamica e Laboratorio
 ${S.grp}
 Data: ____   Ora inizio: ____   Postazione: ${S.post}
@@ -100,7 +99,7 @@ Fattori di influenza: p_atm [kPa] = ____ ; T ambiente [°C] = ____
 Operazioni
 - ore ____ : verifica strumenti, risoluzioni
 - ore ____ : Gay-Lussac, serie 1 (file ____)
-- ore ____ : Charles, serie 1 (file ____)`)+`<h3>Formule (da riportare nel logbook)</h3>`+pre('l2',`Gay-Lussac: Δp = (p0/T0)·ΔT   pendenza attesa k = p0/T0
+- ore ____ : Charles, serie 1 (file ____)`)+`<h3>Formule (da riportare nel logbook)</h3>`+ed('l2',`Gay-Lussac: Δp = (p0/T0)·ΔT   pendenza attesa k = p0/T0
 Charles: ΔV = (V0/T0)·ΔT   pendenza attesa k = V0/T0
 T0 in kelvin = T0[°C] + 273.15
 σB = ris/√12
@@ -126,14 +125,14 @@ const a=Math.min(...o.x),b=Math.max(...o.x),ya=Math.min(...o.y),yb=Math.max(...o
 const st=Math.ceil(o.x.length/300);o.x.forEach((v,j)=>{if(j%st==0)g.fillRect(X(v)-1,Y(o.y[j])-1,3,3)});g.strokeStyle='#e33';g.beginPath();g.moveTo(X(a),Y(o.F.b+o.F.m*a));g.lineTo(X(b),Y(o.F.b+o.F.m*b));g.stroke();
 g.fillStyle=dark?'#ccc':'#222';g.fillText(`x: T [°C] ${f(a)}–${f(b)}   y: ${o.r.type=='GL'?'p [kPa]':'V [cm3]'} ${f(ya)}–${f(yb)}`,5,H-5)})}
 function rpane(){let R=runs_();let h='<h2>Fit lineare per ogni acquisizione</h2><p class="mu">Incollare colonne T [°C] e y (p [kPa] per GL, V [cm3] per CH), una riga per punto. Righe da/a per scartare i punti iniziali. Il fit su dati assoluti dà la stessa pendenza di Δy/ΔT.</p>';
-R.forEach((o,i)=>{const r=o.r;h+=`<div class="card"><input value="${r.name}" onchange="S.runs[${i}].name=this.value;save();draw()"> tipo <select onchange="S.runs[${i}].type=this.value;save();draw()"><option value="GL" ${r.type=='GL'?'selected':''}>Gay-Lussac</option><option value="CH" ${r.type=='CH'?'selected':''}>Charles</option></select>
+R.forEach((o,i)=>{const r=o.r;h+=`<div class="card">${r.sim?'<b class="ko">SIMULATO: non usare nel logbook</b> ':''}<input value="${r.name}" onchange="S.runs[${i}].name=this.value;save();draw()"> tipo <select onchange="S.runs[${i}].type=this.value;save();draw()"><option value="GL" ${r.type=='GL'?'selected':''}>Gay-Lussac</option><option value="CH" ${r.type=='CH'?'selected':''}>Charles</option></select>
 righe da <input type="number" value="${r.a}" onchange="S.runs[${i}].a=+this.value;save();draw()"> a <input type="number" value="${r.b}" onchange="S.runs[${i}].b=+this.value;save();draw()"> σx(T) <input value="${r.sx}" onchange="S.runs[${i}].sx=+this.value;save();draw()"> σy <input value="${r.sy}" onchange="S.runs[${i}].sy=+this.value;save();draw()"> <button onclick="S.runs.splice(${i},1);save();draw()">× elimina</button>
 <textarea rows="4" onchange="S.runs[${i}].txt=this.value;save();draw()">${r.txt}</textarea>`;
 if(o.F){const u=r.type=='GL'?'kPa/K':'cm3/K';h+=tbl('tr'+i,['grandezza','valore'],[['N punti usati',o.x.length],['pendenza m ['+u+']',fu(o.F.m,o.F.sm)],['intercetta b',fu(o.F.b,o.F.sb)],['χ²',f(o.F.c)],['ndf',o.F.nd],['χ²/ndf',f(o.F.cr)],['σm scalata √χ²rid',fu(o.F.m,o.sc)],['atteso k',fu(o.k,o.sk)],['Z (m vs k)',`<span class="${cls(o.z)}">${f(o.z)}</span>`],['Z con σm scalata',f(zz(o.F.m,o.sc,o.k,o.sk))],['T0 stimata [°C]',o.T0?fu(o.T0[0],o.T0[1]):'–']])+plot(o,i)}
 else h+='<p class="mu">Servono almeno 3 punti.</p>';h+='</div>'});
-return h+'<button onclick="S.runs.push({name:\'RUN-\'+(S.runs.length+1),type:\'GL\',txt:\'\',a:1,b:99999,sx:0.05,sy:0.005});save();draw()">+ acquisizione</button>',R&&setTimeout(()=>drawPlots(R),0),h+''}
+h+='<button onclick="S.runs.push({name:\'RUN-\'+(S.runs.length+1),type:\'GL\',txt:\'\',a:1,b:99999,sx:0.05,sy:0.005});save();draw()">+ acquisizione</button>';setTimeout(()=>drawPlots(R),0);return h}
 function tpane(){const R=runs_();let h='<h2>Totali e confronti</h2>';
-['GL','CH'].forEach(t=>{const A=R.filter(o=>o.F&&o.r.type==t);h+=`<h3>${t=='GL'?'Gay-Lussac':'Charles'} (${A.length} acquisizioni)</h3>`;if(!A.length){h+='<p class="mu">Nessun dato.</p>';return}
+['GL','CH'].forEach(t=>{const A=R.filter(o=>o.F&&o.r.type==t&&!o.r.sim);h+=`<h3>${t=='GL'?'Gay-Lussac':'Charles'} (${A.length} acquisizioni)</h3>`;if(!A.length){h+='<p class="mu">Nessun dato.</p>';return}
 const w=A.map(o=>1/o.F.sm**2),W=w.reduce((a,b)=>a+b,0),m=A.reduce((a,o,i)=>a+w[i]*o.F.m,0)/W,s=Math.sqrt(1/W),c=A.reduce((a,o,i)=>a+w[i]*(o.F.m-m)**2,0);
 const ms=A.map(o=>o.F.m),n=ms.length,mm=ms.reduce((a,b)=>a+b,0)/n,va=n>1?ms.reduce((a,b)=>a+(b-mm)**2,0)/(n-1):NaN;
 const k=A[0].k,sk=A[0].sk,z=zz(m,s,k,sk);
@@ -150,6 +149,42 @@ Fit pesato: w = 1/(σy² + m²σx²); m = (S·Sxy − Sx·Sy)/(S·Sxx − Sx²);
 Z = |a − b|/√(σa² + σb²)
 Media pesata: m = Σ(mi/σi²)/Σ(1/σi²), σ = 1/√Σ(1/σi²), χ² = Σ(mi − m)²/σi², ndf = n − 1
 σ scalata = σm·√max(1, χ²/ndf)`)}
-function draw(){nav();const m=$('#m');m.innerHTML={g:guide,l:logb,q:qpane,r:rpane,t:tpane,f:fpane}[tab]()}
+
+const ed=(id,t)=>`<textarea id="${id}" rows="${t.split('\n').length+1}" onchange="S.tx=S.tx||{};S.tx['${id}']=this.value;save()">${(S.tx&&S.tx[id])||t}</textarea><button onclick="cpt('${id}')">Copia</button> <button onclick="if(S.tx)delete S.tx['${id}'];save();draw()">Ripristina modello</button>`;
+function setPost(v){S.post=v;const r=v=='1-20'?{p:0.005,T:0.05}:{p:0.01,T:0.01},t=S.q.find(q=>q.id=='T0');if(t)t.res=r.T;S.runs.forEach(o=>{if(!o.sim){o.sx=r.T;if(o.type=='GL')o.sy=r.p}});save();draw()}
+function guide(){return`<p>Postazione: <select onchange="setPost(this.value)"><option ${S.post=='1-20'?'selected':''}>1-20</option><option ${S.post=='24-30'?'selected':''}>24-30</option></select> (imposta le risoluzioni di T e p) <button onclick="delete S.gd;save();draw()">Ripristina testo originale</button></p><p class="mu">Il testo seguente è modificabile direttamente.</p><div contenteditable id="gd" onblur="S.gd=this.innerHTML;save()">${S.gd||guide0()}</div>`}
+const gauss=()=>Math.sqrt(-2*Math.log(1-Math.random()))*Math.cos(2*Math.PI*Math.random());
+function genSim(){const p=S.sm,n=Math.max(3,p.n|0),L=[];for(let i=0;i<n;i++){const x=p.a+(p.z-p.a)*i/(n-1);L.push((x+p.sx*gauss()).toFixed(2)+'\t'+(p.b+p.m*x+p.sy*gauss()).toFixed(3))}S.simtxt=L.join('\n');save();draw()}
+function spane(){S.sm=S.sm||{m:0.34,b:100,a:20,z:60,n:200,sx:0.05,sy:0.005};S.tg=S.tg||{};
+let h=fcpane()+'<h2>Pianificazione: quante misure servono ancora</h2><p class="mu">Calcolo sui dati reali inseriti. Non viene generato nessun valore. Dato un σ obiettivo: N = s²/(σobiettivo² − σB²) per le grandezze ripetute; N = (σm/σobiettivo)² acquisizioni per le pendenze (media pesata).</p>';
+h+=tbl('tp1',['grandezza','N attuale','σ attuale','σ obiettivo','N totale','ancora da misurare'],S.q.map((q,i)=>{const s=stats(nums(q.vals),q.res),tg=+S.tg['q'+i]||0;const N=s.n>1&&tg>s.b?Math.ceil(s.va/(tg*tg-s.b*s.b)):NaN;
+return[q.id,s.n,f(s.st),`<input value="${S.tg['q'+i]||''}" onchange="S.tg['q${i}']=this.value;save();draw()">`,isFinite(N)?N:'–',isFinite(N)?Math.max(0,N-s.n):'–']}));
+const R=runs_().filter(o=>o.F&&!o.r.sim);
+h+=tbl('tp2',['acquisizione','σm','σ obiettivo','acquisizioni totali'],R.map(o=>{const i=S.runs.indexOf(o.r),tg=+S.tg['r'+i]||0;return[o.r.name,f(o.F.m)+' ± '+f(o.F.sm),`<input value="${S.tg['r'+i]||''}" onchange="S.tg['r${i}']=this.value;save();draw()">`,tg>0?Math.ceil((o.F.sm/tg)**2):'–']}));
+const p=S.sm,I=k=>`<input value="${p[k]}" onchange="S.sm.${k}=+this.value;save()">`;
+h+=`<h2>Simulazione (solo per provare l’app)</h2><p class="ko">I dati vengono generati da un modello con parametri scelti da te (y = b + m·x + rumore gaussiano, Box-Muller), indipendenti dalle misure raccolte. Le acquisizioni simulate sono marcate SIM, escluse dai totali, e non vanno mai usate nel logbook né nella relazione.</p>
+<p>tipo <select onchange="S.simtype=this.value;save()"><option value="GL" ${S.simtype=='CH'?'':'selected'}>Gay-Lussac</option><option value="CH" ${S.simtype=='CH'?'selected':''}>Charles</option></select> m ${I('m')} b ${I('b')} T da ${I('a')} a ${I('z')} N punti ${I('n')} σT ${I('sx')} σy ${I('sy')}</p>
+<button onclick="genSim()">Genera dati di prova</button> <button onclick="S.runs.push({name:'SIM-'+(S.runs.length+1),type:S.simtype||'GL',txt:S.simtxt||'',a:1,b:99999,sx:S.sm.sx,sy:S.sm.sy,sim:true});save();tab='r';draw()">Aggiungi come acquisizione SIM</button>
+<textarea rows="5" onchange="S.simtxt=this.value;save()">${S.simtxt||''}</textarea>`;return h}
+
+const tt=v=>{let c=0;for(let i=0;i<v;i++)c+=gauss()**2;return gauss()/Math.sqrt(c/v)};
+const wm=(ms,ss)=>{const w=ss.map(s=>1/s**2),W=w.reduce((a,b)=>a+b,0),m=ms.reduce((a,x,i)=>a+w[i]*x,0)/W;return{m,s:Math.sqrt(1/W),c:ms.reduce((a,x,i)=>a+w[i]*(x-m)**2,0)}};
+function draws(m,s,n,k){if(S.fmode=='mm'&&k>=2){const z=Array.from({length:k},gauss),zb=z.reduce((a,b)=>a+b,0)/k,c=s*Math.sqrt(k/z.reduce((a,b)=>a+(b-zb)**2,0));return z.map(a=>m+c*(a-zb))}return Array.from({length:k},()=>m+s*Math.sqrt(1+1/n)*tt(n-1))}
+function genFc(key){const k=Math.floor(+S.fk[key])||0;let v,sg=0;
+if(key[0]=='q')v=nums(S.q[+key.slice(1)].vals);else{const A=runs_().filter(o=>o.F&&!o.r.sim&&o.r.type==key.slice(1));v=A.map(o=>o.F.m);sg=A.reduce((a,o)=>a+o.F.sm,0)/(A.length||1)}
+const n=v.length;if(n<2||k<1)return;const m=v.reduce((a,b)=>a+b,0)/n,s=Math.sqrt(v.reduce((a,b)=>a+(b-m)**2,0)/(n-1));S.fc[key]={y:draws(m,s,n,k),n0:n,sg};save();draw()}
+function fcpane(){S.fc=S.fc||{};S.fk=S.fk||{};S.fmode=S.fmode||'t';
+const bt=k=>`<input style="width:50px" value="${S.fk[k]||''}" onchange="S.fk['${k}']=this.value;save()"> <button onclick="genFc('${k}')">Genera</button> <button onclick="delete S.fc['${k}'];save();draw()">Cancella</button>`;
+let h=`<h2>Previsione (valori generati, NON misure)</h2><p class="ko">Stima di cosa uscirà se le misure mancanti si comportano come quelle già raccolte. I valori generati restano separati dalle misure reali: non entrano nelle schede Grandezze e Totali né nel logbook. Quando hai le misure vere, inseriscile in Grandezze e cancella la previsione. Una previsione con N reale diverso da quello di generazione è segnata “obsoleta”.</p>
+<p>Metodo <select onchange="S.fmode=this.value;save()"><option value="t" ${S.fmode=='t'?'selected':''}>Predittivo: x = m + s·√(1+1/n)·t(n−1)</option><option value="mm" ${S.fmode=='mm'?'selected':''}>Campione completo con stessa media e varianza (esatte)</option></select></p>`;
+h+=tbl('tfc',['id','N reale','k da prevedere','media reale','var reale','N prev.','media prev.','var prev.','risultato prev.','Z prev.','χ²/ndf prev.'],S.q.map((q,i)=>{const v=nums(q.vals),sr=stats(v,q.res),c=S.fc['q'+i],e=q.exp!==''?+q.exp:NaN,se=+q.sexp||0;let a=['–','–','–','–','–','–'];
+if(c){const al=v.concat(c.y),sa=stats(al,q.res),z=zz(sa.m,sa.st,e,se),x2=al.reduce((t,u)=>t+((u-e)/Math.hypot(sa.b,se))**2,0);a=[sa.n+(c.n0!=v.length?' (obsoleta)':''),f(sa.m),f(sa.va),fu(sa.m,sa.st),`<span class="${cls(z)}">${f(z)}</span>`,isFinite(x2)?f(x2)+'/'+sa.n:'–']}
+return[q.id,sr.n,bt('q'+i),f(sr.m),f(sr.va),...a]}));
+h+='<h3>Pendenze (media pesata delle acquisizioni)</h3>'+tbl('tfs',['tipo','acq. reali','k','media pesata reale','media pesata prev.','χ²/ndf prev.','Z prev.'],['GL','CH'].map(t=>{const A=runs_().filter(o=>o.F&&!o.r.sim&&o.r.type==t),c=S.fc['s'+t];let r=['–','–','–','–'];
+if(A.length){const ms=A.map(o=>o.F.m),ss=A.map(o=>o.F.sm),w0=wm(ms,ss);r[0]=fu(w0.m,w0.s);
+if(c){const w=wm(ms.concat(c.y),ss.concat(c.y.map(()=>c.sg))),z=zz(w.m,w.s,A[0].k,A[0].sk);r[1]=fu(w.m,w.s);r[2]=f(w.c)+'/'+(ms.length+c.y.length-1);r[3]=`<span class="${cls(z)}">${f(z)}</span>`}}
+return[t,A.length,bt('s'+t),...r]}));
+h+='<h3>Valori generati (previsione)</h3><pre class="ko">'+(Object.keys(S.fc).map(k=>'PREVISIONE '+k+': '+S.fc[k].y.map(f).join(' ')).join('\n')||'nessuno')+'</pre><button onclick="S.fc={};save();draw()">Cancella tutte le previsioni</button><hr>';return h}
+function draw(){nav();const m=$('#m');m.innerHTML={g:guide,l:logb,q:qpane,r:rpane,t:tpane,s:spane,f:fpane}[tab]()}
 draw();
 </script></body></html>
