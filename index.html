@@ -15,7 +15,7 @@ table{border-collapse:collapse;margin:6px 0}td,th{border:1px solid var(--bd);pad
 .sc{overflow-x:auto}.card{border:1px solid var(--bd);border-radius:6px;padding:8px;margin:8px 0}
 pre{background:var(--cd);padding:8px;white-space:pre-wrap;border-radius:4px}.ok{color:var(--ok)}.ko{color:var(--ko)}.mu{color:var(--mu)}
 h2{font-size:15px}h3{font-size:14px;margin:10px 0 4px}canvas{border:1px solid var(--bd);width:100%;max-width:420px}
-</style></head><body>
+</style><script src="https://cdn.jsdelivr.net/pyodide/v0.26.4/full/pyodide.js"></script></head><body>
 <header><h1>P3 · Leggi di Gay-Lussac e Charles — calcolo in laboratorio</h1></header>
 <nav id="nav"></nav><main id="m"></main>
 <script>
@@ -25,30 +25,25 @@ q:[{id:'p0',n:'Pressione assoluta iniziale',u:'kPa',res:0.1,vals:'',exp:'',sexp:
 {id:'T0',n:'Temperatura iniziale',u:'°C',res:0.05,vals:'',exp:'',sexp:''},
 {id:'V0',n:'Volume totale gas (cilindri+tubi)',u:'cm3',res:1,vals:'',exp:'',sexp:''}],
 runs:[{name:'GL-1',type:'GL',txt:'',a:1,b:99999,sx:0.05,sy:0.005},{name:'CH-1',type:'CH',txt:'',a:1,b:99999,sx:0.05,sy:0.1}],
-F:{kGL:'p0/(T0+273.15)',kCh:'V0/(T0+273.15)',sB:'r/Math.sqrt(12)',T0e:'y0/m-273.15'}};
+F:{kGL:'p0/(T0+273.15)',kCh:'V0/(T0+273.15)',sB:'r/sqrt(12)',T0e:'y0/m-273.15'}};
 let S;try{S=JSON.parse(localStorage.getItem('p3'))||JSON.parse(JSON.stringify(DEF))}catch(e){S=JSON.parse(JSON.stringify(DEF))}
+S.F=S.F||DEF.F;for(const k in S.F)S.F[k]=String(S.F[k]).replace(/Math\./g,'');
 const save=()=>{try{localStorage.setItem('p3',JSON.stringify(S))}catch(e){}};
 const nums=s=>String(s).replace(/,/g,'.').split(/[\s;]+/).filter(x=>x!=='').map(Number).filter(isFinite);
 const f=x=>isFinite(x)?String(+x.toPrecision(4)):'–';
 const fu=(v,s)=>{if(!isFinite(v)||!isFinite(s)||s<=0)return f(v);const d=Math.max(0,1-Math.floor(Math.log10(s)));return v.toFixed(Math.min(d,15))+' ± '+s.toFixed(Math.min(d,15))};
-const zz=(a,sa,b,sb)=>Math.abs(a-b)/Math.hypot(sa,sb);
-const ev=(ex,v)=>{try{return new Function(...Object.keys(v),'return '+ex)(...Object.values(v))}catch(e){return NaN}};
-function prop(ex,v){const val={},y0=ev(ex,Object.fromEntries(Object.entries(v).map(([k,a])=>[k,a[0]]))),h={};let s2=0;
-for(const k in v){const [x,s]=v[k];if(!(s>0))continue;const d=1e-6*Math.abs(x)+1e-9,p={},q={};for(const j in v){p[j]=v[j][0];q[j]=v[j][0]}p[k]+=d;q[k]-=d;s2+=((ev(ex,p)-ev(ex,q))/(2*d)*s)**2}return[y0,Math.sqrt(s2)]}
-const sB=r=>ev(S.F.sB,{r});
-function stats(v,r){const n=v.length,m=n?v.reduce((a,b)=>a+b,0)/n:NaN,va=n>1?v.reduce((a,b)=>a+(b-m)**2,0)/(n-1):NaN,s=Math.sqrt(va),sm=s/Math.sqrt(n),b=sB(r);
-return{n,m,va,s,sm,b,st:n>1?Math.hypot(sm,b):b}}
-function fit(x,y,sx,sy){let m=0,b=0,S0,Sx,Sy,Sxx,Sxy,w;for(let it=0;it<8;it++){S0=Sx=Sy=Sxx=Sxy=0;
-for(let i=0;i<x.length;i++){w=1/(sy**2+(m*sx)**2);S0+=w;Sx+=w*x[i];Sy+=w*y[i];Sxx+=w*x[i]**2;Sxy+=w*x[i]*y[i]}
-const D=S0*Sxx-Sx*Sx;m=(S0*Sxy-Sx*Sy)/D;b=(Sy-m*Sx)/S0;var sm=Math.sqrt(S0/D),sb=Math.sqrt(Sxx/D)}
-let c=0;for(let i=0;i<x.length;i++)c+=(y[i]-b-m*x[i])**2/(sy**2+(m*sx)**2);const nd=x.length-2;return{m,sm,b,sb,c,nd,cr:c/nd}}
-const cls=z=>z<3?'ok':'ko';
+const zz=(a,sa,b,sb)=>PYF('z',a,sa,b,sb);
+const PYO=(fn,d,...a)=>{const r=PYF(fn,...a);return r&&typeof r=='object'?r:d};
+const NF={m:NaN,sm:NaN,b:NaN,sb:NaN,cv:NaN,c:NaN,nd:NaN,cr:NaN},NS={n:0,m:NaN,va:NaN,s:NaN,sm:NaN,b:NaN,st:NaN};
+const PYA=(fn,...a)=>PYO(fn,[NaN,NaN],...a),prop=(ex,v)=>PYA('propaga',ex,v),sB=r=>PYF('sigmaB',S.F.sB,r);
+const stats=(v,r)=>PYO('stats',NS,v,r,S.F.sB),fit=(x,y,sx,sy)=>PYO('fit',NF,x,y,sx,sy);
+const cls=z=>isFinite(z)?(z<3?'ok':'ko'):'mu';
 function tbl(id,h,rows){return`<div class="sc"><table id="${id}"><tr>${h.map(x=>`<th>${x}</th>`).join('')}</tr>${rows.map(r=>`<tr>${r.map(c=>`<td>${c}</td>`).join('')}</tr>`).join('')}</table></div><button onclick="cp('${id}')">Copia (TSV per Excel)</button>`}
 function cp(id){const t=[...document.querySelectorAll('#'+id+' tr')].map(r=>[...r.children].map(c=>c.innerText.replace(/\./g,'.')).join('\t')).join('\n');navigator.clipboard.writeText(t)}
 function cpt(id){const e=document.getElementById(id);navigator.clipboard.writeText(e.value!==undefined?e.value:e.innerText)}
 const pre=(id,t)=>`<pre id="${id}">${t}</pre><button onclick="cpt('${id}')">Copia</button>`;
 const post=()=>S.post==='1-20'?{p:'CI-6534 bassa pressione (0–10 kPa relativa, ris. 0.005 kPa)',T:'CI-6605 acciaio inox (ris. 0.05 °C)',x:'CI-6538 moto rotatorio (1/1440 di giro), DataStudio'}:{p:'PS-2181 + AirLink PS-3200 (ris. 0.01 kPa)',T:'PS-3201 wireless (ris. 0.01 °C)',x:'PS-2120A (1/4000 di giro), Capstone'};
-const TABS={g:'Guida misure',l:'Logbook',q:'Grandezze (media/varianza)',r:'Fit e confronto',t:'Totali',s:'Pianificazione e simulazione',f:'Formule'};let tab='g';
+const TABS={g:'Guida',l:'Logbook',q:'Grandezze',r:'Acquisizioni',s:'Previsione',f:'Formule (Python)'};let tab='g';
 function nav(){$('#nav').innerHTML=Object.entries(TABS).map(([k,v])=>`<button class="${k==tab?'on':''}" onclick="tab='${k}';draw()">${v}</button>`).join('')+'<button onclick="exp()">Esporta JSON</button><button onclick="imp()">Importa JSON</button><button onclick="if(confirm(\'Azzerare tutto?\')){S=JSON.parse(JSON.stringify(DEF));save();draw()}">Reset</button>'}
 function exp(){const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([JSON.stringify(S,null,1)],{type:'application/json'}));a.download='p3_dati.json';a.click()}
 function imp(){const i=document.createElement('input');i.type='file';i.onchange=()=>i.files[0].text().then(t=>{S=JSON.parse(t);save();draw()});i.click()}
@@ -70,7 +65,7 @@ function guide0(){return`<h2>Prima di cominciare</h2><ul>
 <li>Stessa procedura di riscaldamento; V0 è il volume di tutto il gas (cilindri + tubicini): stimarlo e annotare la sua incertezza (sistematica dominante).</li>
 <li>Verificare che p resti costante durante la misura; ripetere almeno 2 volte.</li></ol>
 <h2>Accorgimenti</h2><ul><li>Tenuta non perfetta: n può variare per tempi lunghi; misure rapide.</li><li>Ritardo di risposta del sensore T rispetto al gas: salita lenta riduce l'effetto.</li><li>Punti campionati a 10 Hz sono correlati: il χ² del fit può risultare molto piccolo; confrontare con σ scalata.</li><li>Non cancellare dati: barrare e annotare il motivo.</li></ul>`}
-function logb(){const P=post();return`<h2>Da incollare nel logbook</h2>`+ed('l1',`Esperienza P3: Studio delle leggi di Gay-Lussac e Charles
+function logb(){const P=post();return`<h2>Da incollare nel logbook</h2><button onclick="nowTxt()">+ ora</button> `+ed('l1',`Esperienza P3: Studio delle leggi di Gay-Lussac e Charles
 Corso di Termodinamica e Laboratorio
 ${S.grp}
 Data: ____   Ora inizio: ____   Postazione: ${S.post}
@@ -92,6 +87,7 @@ Incertezza di tipo B: sigma = risoluzione/sqrt(12)
 
 Tabella dati (una per ogni acquisizione)
 File: ____ (cartella dati/)  Ora: ____  Frequenza: ____ Hz
+File dati caricati nell'app:${S.runs.filter(r=>r.fname&&!r.sim).map(r=>'\n- '+r.fname).join('')}
 T [°C] ± ____ | p [kPa] ± ____ | V [cm3] ± ____
 
 Fattori di influenza: p_atm [kPa] = ____ ; T ambiente [°C] = ____
@@ -111,7 +107,7 @@ S.q.forEach((q,i)=>{h+=`<tr><td><input value="${q.id}" onchange="S.q[${i}].id=th
 ['res'].map(k=>`<td><input value="${q.res}" onchange="S.q[${i}].res=+this.value;save();draw()"></td>`).join('')+`<td><input class="w" style="min-width:240px" value="${q.vals}" onchange="S.q[${i}].vals=this.value;save();draw()"></td><td><input value="${q.exp}" onchange="S.q[${i}].exp=this.value;save();draw()"></td><td><input value="${q.sexp}" onchange="S.q[${i}].sexp=this.value;save();draw()"></td><td><button onclick="S.q.splice(${i},1);save();draw()">×</button></td></tr>`});
 h+='</table></div><button onclick="S.q.push({id:\'x\'+S.q.length,n:\'\',u:\'\',res:0.1,vals:\'\',exp:\'\',sexp:\'\'});save();draw()">+ grandezza</button>';
 const rows=S.q.map(q=>{const s=stats(nums(q.vals),q.res),e=q.exp!==''?+q.exp:NaN,se=+q.sexp||0;let z=NaN,c=NaN;
-if(isFinite(e)&&s.n){z=zz(s.m,s.st,e,se);c=nums(q.vals).reduce((a,v)=>a+((v-e)/Math.hypot(s.b,se))**2,0)}
+if(isFinite(e)&&s.n){z=zz(s.m,s.st,e,se);c=PYF('chi2',nums(q.vals),e,Math.hypot(s.b,se))}
 return[q.id,s.n,f(s.m),f(s.va),f(s.s),f(s.sm),f(s.b),fu(s.m,s.st)+' '+q.u,f(e),`<span class="${cls(z)}">${f(z)}</span>`,f(c)+(isFinite(c)?'/'+s.n:'')]});
 return h+'<h3>Risultati</h3>'+tbl('tq',['id','N','media','varianza','dev.std s','s/√N','σB','risultato','atteso','Z','χ²/ndf'],rows)}
 function vars_(){const v={};S.q.forEach(q=>{const s=stats(nums(q.vals),q.res);if(s.n)v[q.id]=[s.m,s.st]});return v}
@@ -125,31 +121,20 @@ const a=Math.min(...o.x),b=Math.max(...o.x),ya=Math.min(...o.y),yb=Math.max(...o
 const st=Math.ceil(o.x.length/300);o.x.forEach((v,j)=>{if(j%st==0)g.fillRect(X(v)-1,Y(o.y[j])-1,3,3)});g.strokeStyle='#e33';g.beginPath();g.moveTo(X(a),Y(o.F.b+o.F.m*a));g.lineTo(X(b),Y(o.F.b+o.F.m*b));g.stroke();
 g.fillStyle=dark?'#ccc':'#222';g.fillText(`x: T [°C] ${f(a)}–${f(b)}   y: ${o.r.type=='GL'?'p [kPa]':'V [cm3]'} ${f(ya)}–${f(yb)}`,5,H-5)})}
 function rpane(){let R=runs_();let h='<h2>Fit lineare per ogni acquisizione</h2><p class="mu">Incollare colonne T [°C] e y (p [kPa] per GL, V [cm3] per CH), una riga per punto. Righe da/a per scartare i punti iniziali. Il fit su dati assoluti dà la stessa pendenza di Δy/ΔT.</p>';
-R.forEach((o,i)=>{const r=o.r;h+=`<div class="card">${r.sim?'<b class="ko">SIMULATO: non usare nel logbook</b> ':''}<input value="${r.name}" onchange="S.runs[${i}].name=this.value;save();draw()"> tipo <select onchange="S.runs[${i}].type=this.value;save();draw()"><option value="GL" ${r.type=='GL'?'selected':''}>Gay-Lussac</option><option value="CH" ${r.type=='CH'?'selected':''}>Charles</option></select>
+R.forEach((o,i)=>{const r=o.r;h+=`<div class="card">${r.sim?'<b class="ko">PREVISIONE (dati generati): non usare nel logbook</b> ':''}<input value="${r.name}" onchange="S.runs[${i}].name=this.value;save();draw()"> tipo <select onchange="S.runs[${i}].type=this.value;save();draw()"><option value="GL" ${r.type=='GL'?'selected':''}>Gay-Lussac</option><option value="CH" ${r.type=='CH'?'selected':''}>Charles</option></select>
 righe da <input type="number" value="${r.a}" onchange="S.runs[${i}].a=+this.value;save();draw()"> a <input type="number" value="${r.b}" onchange="S.runs[${i}].b=+this.value;save();draw()"> σx(T) <input value="${r.sx}" onchange="S.runs[${i}].sx=+this.value;save();draw()"> σy <input value="${r.sy}" onchange="S.runs[${i}].sy=+this.value;save();draw()"> <button onclick="S.runs.splice(${i},1);save();draw()">× elimina</button>
+<div class="mu">file dati: <input type="file" accept=".csv,.txt,.tsv,.dat" onchange="loadFile(${i},this)"> ${r.raw?`${r.fname} · T ${colSel(i,'tc',r)} y ${colSel(i,'yc',r)} tempo ${colSel(i,'tm',r)} · y = lettura × <input style="width:60px" value="${r.k||1}" onchange="S.runs[${i}].k=+this.value||1;applyCols(S.runs[${i}]);save();draw()"> + <input style="width:60px" value="${r.o||0}" onchange="S.runs[${i}].o=+this.value||0;applyCols(S.runs[${i}]);save();draw()"> <button onclick="autoRange(S.runs[${i}]);save();draw()">Auto tratto lineare</button>`:''}</div>
 <textarea rows="4" onchange="S.runs[${i}].txt=this.value;save();draw()">${r.txt}</textarea>`;
-if(o.F){const u=r.type=='GL'?'kPa/K':'cm3/K';h+=tbl('tr'+i,['grandezza','valore'],[['N punti usati',o.x.length],['pendenza m ['+u+']',fu(o.F.m,o.F.sm)],['intercetta b',fu(o.F.b,o.F.sb)],['χ²',f(o.F.c)],['ndf',o.F.nd],['χ²/ndf',f(o.F.cr)],['σm scalata √χ²rid',fu(o.F.m,o.sc)],['atteso k',fu(o.k,o.sk)],['Z (m vs k)',`<span class="${cls(o.z)}">${f(o.z)}</span>`],['Z con σm scalata',f(zz(o.F.m,o.sc,o.k,o.sk))],['T0 stimata [°C]',o.T0?fu(o.T0[0],o.T0[1]):'–']])+plot(o,i)}
+if(o.F){const u=r.type=='GL'?'kPa/K':'cm3/K';h+=tbl('tr'+i,['grandezza','valore'],[['N punti usati',o.x.length],['pendenza m ['+u+']',fu(o.F.m,o.F.sm)],['intercetta b',fu(o.F.b,o.F.sb)],['χ²',f(o.F.c)],['ndf',o.F.nd],['χ²/ndf',f(o.F.cr)],['σm scalata √χ²rid',fu(o.F.m,o.sc)],['atteso k',fu(o.k,o.sk)],['Z (m vs k)',`<span class="${cls(o.z)}">${f(o.z)}</span>`],['Z con σm scalata',f(zz(o.F.m,o.sc,o.k,o.sk))],['T0 stimata [°C]',o.T0?fu(o.T0[0],o.T0[1]):'–'],['T a y=0 [°C] (atteso −273.15, se y assoluto)',fu(...PYA('zero_assoluto',o.F.b,o.F.sb,o.F.m,o.F.sm,o.F.cv))]])+chk(o)+plot(o,i)}
 else h+='<p class="mu">Servono almeno 3 punti.</p>';h+='</div>'});
-h+='<button onclick="S.runs.push({name:\'RUN-\'+(S.runs.length+1),type:\'GL\',txt:\'\',a:1,b:99999,sx:0.05,sy:0.005});save();draw()">+ acquisizione</button>';setTimeout(()=>drawPlots(R),0);return h}
+h+='<button onclick="S.runs.push({name:\'RUN-\'+(S.runs.length+1),type:\'GL\',txt:\'\',a:1,b:99999,sx:0.05,sy:0.005});save();draw()">+ acquisizione</button>';setTimeout(()=>drawPlots(R),0);return h+tpane()}
 function tpane(){const R=runs_();let h='<h2>Totali e confronti</h2>';
 ['GL','CH'].forEach(t=>{const A=R.filter(o=>o.F&&o.r.type==t&&!o.r.sim);h+=`<h3>${t=='GL'?'Gay-Lussac':'Charles'} (${A.length} acquisizioni)</h3>`;if(!A.length){h+='<p class="mu">Nessun dato.</p>';return}
-const w=A.map(o=>1/o.F.sm**2),W=w.reduce((a,b)=>a+b,0),m=A.reduce((a,o,i)=>a+w[i]*o.F.m,0)/W,s=Math.sqrt(1/W),c=A.reduce((a,o,i)=>a+w[i]*(o.F.m-m)**2,0);
-const ms=A.map(o=>o.F.m),n=ms.length,mm=ms.reduce((a,b)=>a+b,0)/n,va=n>1?ms.reduce((a,b)=>a+(b-mm)**2,0)/(n-1):NaN;
+const ws=wm(A.map(o=>o.F.m),A.map(o=>o.F.sm)),m=ws.m,s=ws.s,c=ws.c,ms=A.map(o=>o.F.m),n=ms.length,sg=stats(ms,0),mm=sg.m,va=sg.va;
 const k=A[0].k,sk=A[0].sk,z=zz(m,s,k,sk);
 h+=tbl('tt'+t,['grandezza','valore'],[['media pesata pendenze',fu(m,s)],['χ² tra acquisizioni / ndf',f(c)+' / '+(n-1)],['Z (media pesata vs atteso)',`<span class="${cls(z)}">${f(z)}</span>`],['media semplice',f(mm)],['varianza (n−1)',f(va)],['dev.std / σ media',f(Math.sqrt(va))+' / '+f(Math.sqrt(va/n))],['atteso k',fu(k,sk)]]);
 if(n>1){const r=[];for(let i=0;i<n;i++)for(let j=i+1;j<n;j++){const zv=zz(A[i].F.m,A[i].F.sm,A[j].F.m,A[j].F.sm);r.push([A[i].r.name+' vs '+A[j].r.name,`<span class="${cls(zv)}">${f(zv)}</span>`])}h+=tbl('tz'+t,['coppia','Z'],r)}});
 return h+'<p class="mu">Z&lt;3 compatibile (verde). Per una grandezza ripetuta usare la scheda “Grandezze”.</p>'}
-function fpane(){const L={kGL:'Pendenza attesa Gay-Lussac (variabili = id grandezze)',kCh:'Pendenza attesa Charles',sB:'Incertezza tipo B (r = risoluzione)',T0e:'T0 stimata da pendenza (y0 = p0 o V0, m = pendenza)'};
-return'<h2>Formule (modificabili, sintassi JavaScript)</h2><p class="mu">σ calcolata per propagazione numerica (derivate parziali) dalle incertezze delle grandezze. Per un valore atteso fisso scrivere un numero.</p>'+Object.keys(L).map(k=>`<p>${L[k]}<br><input class="w" value="${S.F[k]}" onchange="S.F.${k}=this.value;save();draw()"></p>`).join('')+
-'<h3>Formule fisse usate dall’app</h3>'+pre('ff',`Media = Σxi/N          Varianza = Σ(xi−media)²/(N−1)          s = √varianza
-σ media = s/√N          σ totale = √((s/√N)² + σB²)   (N=1: σ = σB)
-Fit pesato: w = 1/(σy² + m²σx²); m = (S·Sxy − Sx·Sy)/(S·Sxx − Sx²); b = (Sy − m·Sx)/S
-σm = √(S/(S·Sxx − Sx²))      σb = √(Sxx/(S·Sxx − Sx²))
-χ² = Σ w·(yi − b − m·xi)²   ndf = N − 2   (grandezze ripetute vs atteso: ndf = N)
-Z = |a − b|/√(σa² + σb²)
-Media pesata: m = Σ(mi/σi²)/Σ(1/σi²), σ = 1/√Σ(1/σi²), χ² = Σ(mi − m)²/σi², ndf = n − 1
-σ scalata = σm·√max(1, χ²/ndf)`)}
-
 const ed=(id,t)=>`<textarea id="${id}" rows="${t.split('\n').length+1}" onchange="S.tx=S.tx||{};S.tx['${id}']=this.value;save()">${(S.tx&&S.tx[id])||t}</textarea><button onclick="cpt('${id}')">Copia</button> <button onclick="if(S.tx)delete S.tx['${id}'];save();draw()">Ripristina modello</button>`;
 function setPost(v){S.post=v;const r=v=='1-20'?{p:0.005,T:0.05}:{p:0.01,T:0.01},t=S.q.find(q=>q.id=='T0');if(t)t.res=r.T;S.runs.forEach(o=>{if(!o.sim){o.sx=r.T;if(o.type=='GL')o.sy=r.p}});save();draw()}
 function guide(){return`<p>Postazione: <select onchange="setPost(this.value)"><option ${S.post=='1-20'?'selected':''}>1-20</option><option ${S.post=='24-30'?'selected':''}>24-30</option></select> (imposta le risoluzioni di T e p) <button onclick="delete S.gd;save();draw()">Ripristina testo originale</button></p><p class="mu">Il testo seguente è modificabile direttamente.</p><div contenteditable id="gd" onblur="S.gd=this.innerHTML;save()">${S.gd||guide0()}</div>`}
@@ -157,19 +142,15 @@ const gauss=()=>Math.sqrt(-2*Math.log(1-Math.random()))*Math.cos(2*Math.PI*Math.
 function genSim(){const p=S.sm,n=Math.max(3,p.n|0),L=[];for(let i=0;i<n;i++){const x=p.a+(p.z-p.a)*i/(n-1);L.push((x+p.sx*gauss()).toFixed(2)+'\t'+(p.b+p.m*x+p.sy*gauss()).toFixed(3))}S.simtxt=L.join('\n');save();draw()}
 function spane(){S.sm=S.sm||{m:0.34,b:100,a:20,z:60,n:200,sx:0.05,sy:0.005};S.tg=S.tg||{};
 let h=fcpane()+'<h2>Pianificazione: quante misure servono ancora</h2><p class="mu">Calcolo sui dati reali inseriti. Non viene generato nessun valore. Dato un σ obiettivo: N = s²/(σobiettivo² − σB²) per le grandezze ripetute; N = (σm/σobiettivo)² acquisizioni per le pendenze (media pesata).</p>';
-h+=tbl('tp1',['grandezza','N attuale','σ attuale','σ obiettivo','N totale','ancora da misurare'],S.q.map((q,i)=>{const s=stats(nums(q.vals),q.res),tg=+S.tg['q'+i]||0;const N=s.n>1&&tg>s.b?Math.ceil(s.va/(tg*tg-s.b*s.b)):NaN;
+h+=tbl('tp1',['grandezza','N attuale','σ attuale','σ obiettivo','N totale','ancora da misurare'],S.q.map((q,i)=>{const s=stats(nums(q.vals),q.res),tg=+S.tg['q'+i]||0;const N=s.n>1&&tg>s.b?PYF('n_necessari',s.va,s.b,tg):NaN;
 return[q.id,s.n,f(s.st),`<input value="${S.tg['q'+i]||''}" onchange="S.tg['q${i}']=this.value;save();draw()">`,isFinite(N)?N:'–',isFinite(N)?Math.max(0,N-s.n):'–']}));
 const R=runs_().filter(o=>o.F&&!o.r.sim);
-h+=tbl('tp2',['acquisizione','σm','σ obiettivo','acquisizioni totali'],R.map(o=>{const i=S.runs.indexOf(o.r),tg=+S.tg['r'+i]||0;return[o.r.name,f(o.F.m)+' ± '+f(o.F.sm),`<input value="${S.tg['r'+i]||''}" onchange="S.tg['r${i}']=this.value;save();draw()">`,tg>0?Math.ceil((o.F.sm/tg)**2):'–']}));
-const p=S.sm,I=k=>`<input value="${p[k]}" onchange="S.sm.${k}=+this.value;save()">`;
-h+=`<h2>Simulazione (solo per provare l’app)</h2><p class="ko">I dati vengono generati da un modello con parametri scelti da te (y = b + m·x + rumore gaussiano, Box-Muller), indipendenti dalle misure raccolte. Le acquisizioni simulate sono marcate SIM, escluse dai totali, e non vanno mai usate nel logbook né nella relazione.</p>
-<p>tipo <select onchange="S.simtype=this.value;save()"><option value="GL" ${S.simtype=='CH'?'':'selected'}>Gay-Lussac</option><option value="CH" ${S.simtype=='CH'?'selected':''}>Charles</option></select> m ${I('m')} b ${I('b')} T da ${I('a')} a ${I('z')} N punti ${I('n')} σT ${I('sx')} σy ${I('sy')}</p>
-<button onclick="genSim()">Genera dati di prova</button> <button onclick="S.runs.push({name:'SIM-'+(S.runs.length+1),type:S.simtype||'GL',txt:S.simtxt||'',a:1,b:99999,sx:S.sm.sx,sy:S.sm.sy,sim:true});save();tab='r';draw()">Aggiungi come acquisizione SIM</button>
-<textarea rows="5" onchange="S.simtxt=this.value;save()">${S.simtxt||''}</textarea>`;return h}
+h+=tbl('tp2',['acquisizione','σm','σ obiettivo','acquisizioni totali'],R.map(o=>{const i=S.runs.indexOf(o.r),tg=+S.tg['r'+i]||0;return[o.r.name,f(o.F.m)+' ± '+f(o.F.sm),`<input value="${S.tg['r'+i]||''}" onchange="S.tg['r${i}']=this.value;save();draw()">`,tg>0?PYF('n_pendenza',o.F.sm,tg):'–']}));
+return h}
 
 const tt=v=>{let c=0;for(let i=0;i<v;i++)c+=gauss()**2;return gauss()/Math.sqrt(c/v)};
-const wm=(ms,ss)=>{const w=ss.map(s=>1/s**2),W=w.reduce((a,b)=>a+b,0),m=ms.reduce((a,x,i)=>a+w[i]*x,0)/W;return{m,s:Math.sqrt(1/W),c:ms.reduce((a,x,i)=>a+w[i]*(x-m)**2,0)}};
-function draws(m,s,n,k){if(S.fmode=='mm'&&k>=2){const z=Array.from({length:k},gauss),zb=z.reduce((a,b)=>a+b,0)/k,c=s*Math.sqrt(k/z.reduce((a,b)=>a+(b-zb)**2,0));return z.map(a=>m+c*(a-zb))}return Array.from({length:k},()=>m+s*Math.sqrt(1+1/n)*tt(n-1))}
+const wm=(ms,ss)=>PYO('wmean',{m:NaN,s:NaN,c:NaN},ms,ss);
+const draws=(m,s,n,k)=>PYO('previsione',[],m,s,n,k,S.fmode);
 function genFc(key){const k=Math.floor(+S.fk[key])||0;let v,sg=0;
 if(key[0]=='q')v=nums(S.q[+key.slice(1)].vals);else{const A=runs_().filter(o=>o.F&&!o.r.sim&&o.r.type==key.slice(1));v=A.map(o=>o.F.m);sg=A.reduce((a,o)=>a+o.F.sm,0)/(A.length||1)}
 const n=v.length;if(n<2||k<1)return;const m=v.reduce((a,b)=>a+b,0)/n,s=Math.sqrt(v.reduce((a,b)=>a+(b-m)**2,0)/(n-1));S.fc[key]={y:draws(m,s,n,k),n0:n,sg};save();draw()}
@@ -178,13 +159,157 @@ const bt=k=>`<input style="width:50px" value="${S.fk[k]||''}" onchange="S.fk['${
 let h=`<h2>Previsione (valori generati, NON misure)</h2><p class="ko">Stima di cosa uscirà se le misure mancanti si comportano come quelle già raccolte. I valori generati restano separati dalle misure reali: non entrano nelle schede Grandezze e Totali né nel logbook. Quando hai le misure vere, inseriscile in Grandezze e cancella la previsione. Una previsione con N reale diverso da quello di generazione è segnata “obsoleta”.</p>
 <p>Metodo <select onchange="S.fmode=this.value;save()"><option value="t" ${S.fmode=='t'?'selected':''}>Predittivo: x = m + s·√(1+1/n)·t(n−1)</option><option value="mm" ${S.fmode=='mm'?'selected':''}>Campione completo con stessa media e varianza (esatte)</option></select></p>`;
 h+=tbl('tfc',['id','N reale','k da prevedere','media reale','var reale','N prev.','media prev.','var prev.','risultato prev.','Z prev.','χ²/ndf prev.'],S.q.map((q,i)=>{const v=nums(q.vals),sr=stats(v,q.res),c=S.fc['q'+i],e=q.exp!==''?+q.exp:NaN,se=+q.sexp||0;let a=['–','–','–','–','–','–'];
-if(c){const al=v.concat(c.y),sa=stats(al,q.res),z=zz(sa.m,sa.st,e,se),x2=al.reduce((t,u)=>t+((u-e)/Math.hypot(sa.b,se))**2,0);a=[sa.n+(c.n0!=v.length?' (obsoleta)':''),f(sa.m),f(sa.va),fu(sa.m,sa.st),`<span class="${cls(z)}">${f(z)}</span>`,isFinite(x2)?f(x2)+'/'+sa.n:'–']}
+if(c){const al=v.concat(c.y),sa=stats(al,q.res),z=zz(sa.m,sa.st,e,se),x2=PYF('chi2',al,e,Math.hypot(sa.b,se));a=[sa.n+(c.n0!=v.length?' (obsoleta)':''),f(sa.m),f(sa.va),fu(sa.m,sa.st),`<span class="${cls(z)}">${f(z)}</span>`,isFinite(x2)?f(x2)+'/'+sa.n:'–']}
 return[q.id,sr.n,bt('q'+i),f(sr.m),f(sr.va),...a]}));
 h+='<h3>Pendenze (media pesata delle acquisizioni)</h3>'+tbl('tfs',['tipo','acq. reali','k','media pesata reale','media pesata prev.','χ²/ndf prev.','Z prev.'],['GL','CH'].map(t=>{const A=runs_().filter(o=>o.F&&!o.r.sim&&o.r.type==t),c=S.fc['s'+t];let r=['–','–','–','–'];
 if(A.length){const ms=A.map(o=>o.F.m),ss=A.map(o=>o.F.sm),w0=wm(ms,ss);r[0]=fu(w0.m,w0.s);
 if(c){const w=wm(ms.concat(c.y),ss.concat(c.y.map(()=>c.sg))),z=zz(w.m,w.s,A[0].k,A[0].sk);r[1]=fu(w.m,w.s);r[2]=f(w.c)+'/'+(ms.length+c.y.length-1);r[3]=`<span class="${cls(z)}">${f(z)}</span>`}}
 return[t,A.length,bt('s'+t),...r]}));
-h+='<h3>Valori generati (previsione)</h3><pre class="ko">'+(Object.keys(S.fc).map(k=>'PREVISIONE '+k+': '+S.fc[k].y.map(f).join(' ')).join('\n')||'nessuno')+'</pre><button onclick="S.fc={};save();draw()">Cancella tutte le previsioni</button><hr>';return h}
-function draw(){nav();const m=$('#m');m.innerHTML={g:guide,l:logb,q:qpane,r:rpane,t:tpane,s:spane,f:fpane}[tab]()}
-draw();
+h+='<h3>Valori generati (previsione)</h3><pre class="ko">'+(Object.keys(S.fc).map(k=>'PREVISIONE '+k+': '+S.fc[k].y.map(f).join(' ')).join('\n')||'nessuno')+'</pre><h3>File dati di previsione</h3><p class="mu">Genera un file nello stesso formato dei file reali caricati (intestazione, separatore, decimali, colonne, passo temporale) con T e y simulati dal modello medio di tutte le acquisizioni reali: velocità di riscaldamento, pendenza, intercetta e rumore residuo. Il nome inizia con PREVISIONE_, la prima riga è un commento # PREVISIONE, e l’acquisizione PREV viene esclusa dai totali.</p><button onclick="genFile(\'GL\')">Gay-Lussac</button> <button onclick="genFile(\'CH\')">Charles</button> righe <input style="width:60px" value="'+(S.fn||'')+'" onchange="S.fn=this.value;save()"> (vuoto = come l’ultimo file)<br><button onclick="S.fc={};save();draw()">Cancella tutte le previsioni</button><hr>';return h}
+
+function nowTxt(){const e=document.getElementById('l1');e.value+='\n- ore '+new Date().toTimeString().slice(0,5)+' : ';S.tx=S.tx||{};S.tx.l1=e.value;save();e.scrollTop=e.scrollHeight}
+function parseFile(t){const L=t.split(/\r?\n/),dl=/\t/.test(t)?'\t':/;/.test(t)?';':/,/.test(t)?',':/\s+/,cm=dl!==','&&/\d,\d/.test(t),hdr=[],rows=[],dp=[];
+const sp=l=>l.trim().split(dl).map(x=>x.replace(/^"|"$/g,'').trim()),fx=x=>cm?x.replace(',','.'):x,num=x=>x!==''&&isFinite(+fx(x));
+for(const l of L){const q=l.trim();if(!q)continue;if(q[0]=='#'){if(!rows.length)hdr.push(l);continue}const F=sp(q);
+if(F.length>=2&&F.every(num)){rows.push(F.map(x=>+fx(x)));if(rows.length<60)F.forEach((x,i)=>{dp[i]=Math.max(dp[i]||0,(x.split(/[.,]/)[1]||'').length)})}else if(!rows.length)hdr.push(l)}
+const n=rows[0]?rows[0].length:0,nl=[...hdr].reverse().find(l=>l.trim()[0]!='#'),nm=nl&&sp(nl).length==n?sp(nl):Array.from({length:n},(_,i)=>'col'+(i+1));return{rows,hdr,dp,names:nm,n,dl,cm}}
+function applyCols(r){const P=parseFile(r.raw);r.txt=P.rows.map(a=>a[r.tc]+'\t'+(+(a[r.yc]*(r.k||1)+(r.o||0)).toPrecision(10))).join('\n')}
+function autoRange(r){const T=parseFile(r.raw).rows.map(a=>a[r.tc]),n=T.length;r.a=1;r.b=99999;if(n<20)return;const w=Math.max(3,Math.floor(n/25)),s=T.map((v,i)=>i+w<n?(T[i+w]-v)/w:NaN),m=s.filter(isFinite).sort((x,y)=>x-y),md=m[Math.floor(m.length*0.75)];
+if(!(md>0))return;const ok=s.map(v=>v>=0.8*md),a=ok.findIndex((v,i)=>v&&ok[i+w]);r.a=Math.max(1,a+1);r.b=Math.min(n,ok.lastIndexOf(true)+w+1)}
+function loadFile(i,inp){const fl=inp.files[0];if(!fl)return;fl.text().then(t=>{const r=S.runs[i],P=parseFile(t);if(P.rows.length<3){alert('Nessuna tabella numerica trovata nel file');return}
+const g=re=>P.names.findIndex(n=>re.test(n)),tc=g(/temperatur|°c|celsius/i),yc=g(r.type=='GL'?/press|kpa|\bpa\b/i:/posiz|spost|volum|position|displac|cm/i),tm=g(/^(tempo|time)\b|\(s\)/i);
+r.raw=t;r.fname=fl.name;r.sim=/PREVISIONE/.test(t);r.name=fl.name.replace(/\.\w+$/,'').slice(0,24);r.tc=tc>=0?tc:(P.n>2?1:0);r.yc=yc>=0?yc:P.n-1;r.tm=tm>=0?tm:(r.tc==0?-1:0);r.k=r.k||1;r.o=r.o||0;applyCols(r);autoRange(r);save();draw()})}
+const colSel=(i,k,r)=>`<select onchange="S.runs[${i}].${k}=+this.value;applyCols(S.runs[${i}]);save();draw()">${parseFile(r.raw).names.map((n,j)=>`<option value="${j}" ${r[k]==j?'selected':''}>${n}</option>`).join('')}</select>`;
+const chk=o=>{const R=Math.max(...o.x)-Math.min(...o.x),c=[['Z<3',isFinite(o.z)?o.z<3:null],['χ²/ndf tra 0.3 e 3',o.F.cr>0.3&&o.F.cr<3],['intervallo T ≥ 10 K ('+f(R)+')',R>=10],['N ≥ 10',o.x.length>=10]];return'<p>'+c.map(([t,k])=>`<span class="${k===null?'mu':k?'ok':'ko'}">${k===null?'–':k?'✓':'✗'} ${t}</span>`).join(' · ')+'</p>'}
+function genFile(t){const A=runs_().filter(o=>o.F&&!o.r.sim&&o.r.type==t&&o.r.raw&&o.r.tm>=0);if(!A.length){alert('Serve almeno un file reale di questo tipo, con colonna del tempo');return}
+const st=A.map(o=>{const r=o.r,tt=parseFile(r.raw).rows.slice(r.a-1,r.b).map(a=>a[r.tm]);return{...PYO('modello',{rate:NaN,T0:NaN,sdT:NaN,sdY:NaN},tt,o.x,o.y,o.F.b,o.F.m),m:o.F.m,b:o.F.b}}),av=k=>st.reduce((a,x)=>a+x[k],0)/st.length;
+const ref=A[A.length-1].r,P=parseFile(ref.raw),R=P.rows.slice(ref.a-1,ref.b),N=Math.max(3,Math.floor(+S.fn)||R.length),t0=R[0][ref.tm],dt=(R[R.length-1][ref.tm]-t0)/(R.length-1),J=P.dl instanceof RegExp?' ':P.dl,k=ref.k||1,o=ref.o||0,out=['# PREVISIONE - dati generati dal modello, NON sono misure (da '+A.length+' acquisizioni reali)',...P.hdr];
+const XY=PYF('punti',N,dt,av('T0'),av('rate'),av('sdT'),av('b'),av('m'),av('sdY'));
+for(let j=0;j<N;j++){const tj=t0+j*dt,x=XY[0][j],y=XY[1][j];
+out.push(P.names.map((_,c)=>{let v=c==ref.tm?tj:c==ref.tc?x:c==ref.yc?(y-o)/k:R[j%R.length][c];v=v.toFixed(P.dp[c]||0);return P.cm?v.replace('.',','):v}).join(J))}
+const txt=out.join('\n'),fn='PREVISIONE_'+t+'_'+(ref.fname||'dati.csv'),nr={name:'PREV-'+t,type:t,sim:true,raw:txt,fname:fn,tm:ref.tm,tc:ref.tc,yc:ref.yc,k,o,a:1,b:99999,sx:ref.sx,sy:ref.sy,txt:''};applyCols(nr);autoRange(nr);
+const j=S.runs.findIndex(r=>r.name=='PREV-'+t);j>=0?S.runs[j]=nr:S.runs.push(nr);save();const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([txt],{type:'text/plain'}));a.download=fn;a.click();draw()}
+
+const PROG={statistica:`import math, random
+# Statistica di base: media, varianza campionaria, incertezze, Z, chi2
+def sigmaB(expr, r):
+    return eval(expr, {"sqrt": math.sqrt, "r": r})          # sigma_B = risoluzione/sqrt(12)
+def stats(v, r, expr):
+    n = len(v)
+    m = sum(v)/n if n else float("nan")
+    va = sum((x-m)**2 for x in v)/(n-1) if n > 1 else float("nan")   # varianza con N-1
+    s = math.sqrt(va) if n > 1 else float("nan")
+    sm = s/math.sqrt(n) if n > 1 else float("nan")                   # sigma della media
+    b = sigmaB(expr, r)
+    st = math.hypot(sm, b) if n > 1 else b                           # incertezza totale
+    return dict(n=n, m=m, va=va, s=s, sm=sm, b=b, st=st)
+def z(a, sa, b, sb):
+    return abs(a-b)/math.hypot(sa, sb)
+def chi2(v, atteso, sigma):
+    return sum(((x-atteso)/sigma)**2 for x in v)
+def wmean(ms, ss):                                                   # media pesata
+    w = [1/s**2 for s in ss]; W = sum(w)
+    m = sum(wi*x for wi, x in zip(w, ms))/W
+    return dict(m=m, s=math.sqrt(1/W), c=sum(wi*(x-m)**2 for wi, x in zip(w, ms)))
+def n_necessari(var, sigB, target):
+    return math.ceil(var/(target**2-sigB**2)) if target > sigB else float("nan")
+def n_pendenza(sm, target):
+    return math.ceil((sm/target)**2) if target > 0 else float("nan")`,
+fit:`import math
+# Fit lineare y = b + m x con varianza efficace sy^2 + m^2 sx^2
+def fit(x, y, sx, sy):
+    n = len(x); m = 0.0
+    for _ in range(8):
+        w = 1/(sy**2 + (m*sx)**2)
+        S0 = w*n; Sx = w*sum(x); Sy = w*sum(y)
+        Sxx = w*sum(a*a for a in x); Sxy = w*sum(a*c for a, c in zip(x, y))
+        D = S0*Sxx - Sx**2
+        m = (S0*Sxy - Sx*Sy)/D
+        b = (Sy - m*Sx)/S0
+    w = 1/(sy**2 + (m*sx)**2)
+    c2 = w*sum((c - b - m*a)**2 for a, c in zip(x, y))
+    return dict(m=m, sm=math.sqrt(S0/D), b=b, sb=math.sqrt(Sxx/D), cv=-Sx/D, c=c2, nd=n-2, cr=c2/(n-2))`,
+atteso:`import math
+# Valore atteso e propagazione numerica delle incertezze (variabili indipendenti)
+def valuta(expr, v):
+    env = {"sqrt": math.sqrt, "exp": math.exp, "log": math.log, "pi": math.pi}
+    env.update(v)
+    return eval(expr, env)
+def propaga(expr, v):                       # v = {nome: [valore, incertezza]}
+    val = {k: a[0] for k, a in v.items()}
+    y0 = valuta(expr, val); s2 = 0.0
+    for k, (x, s) in v.items():
+        if s > 0:
+            d = 1e-6*abs(x) + 1e-9
+            p = dict(val); q = dict(val); p[k] += d; q[k] -= d
+            s2 += ((valuta(expr, p) - valuta(expr, q))/(2*d)*s)**2
+    return [y0, math.sqrt(s2)]
+def zero_assoluto(b, sb, m, sm, cv):       # T per cui y = 0, con covarianza tra b e m
+    t = -b/m
+    var = (sb/m)**2 + (b*sm/m**2)**2 - 2*b/m**3*cv
+    return [t, math.sqrt(max(var, 0))]`,
+previsione:`import math, random
+# Previsioni (valori generati, NON misure)
+def previsione(m, s, n, k, modo):
+    if modo == "mm" and k >= 2:             # campione completo con stessa media e varianza
+        z = [random.gauss(0, 1) for _ in range(k)]
+        zb = sum(z)/k
+        c = s*math.sqrt(k/sum((a-zb)**2 for a in z))
+        return [m + c*(a-zb) for a in z]
+    out = []                                # predittivo: m + s*sqrt(1+1/n)*t(n-1)
+    for _ in range(k):
+        nu = n-1
+        chi = sum(random.gauss(0, 1)**2 for _ in range(nu))
+        out.append(m + s*math.sqrt(1+1/n)*random.gauss(0, 1)/math.sqrt(chi/nu))
+    return out
+def modello(tt, x, y, b, m):                # velocita' di riscaldamento e rumore residuo
+    n = len(tt); mt = sum(tt)/n; mx = sum(x)/n
+    rate = sum((u-mt)*(a-mx) for u, a in zip(tt, x))/sum((u-mt)**2 for u in tt)
+    T0 = mx - rate*(mt-tt[0])
+    sdT = math.sqrt(sum((a-T0-rate*(u-tt[0]))**2 for u, a in zip(tt, x))/(n-2))
+    sdY = math.sqrt(sum((c-b-m*a)**2 for a, c in zip(x, y))/(n-2))
+    return dict(rate=rate, T0=T0, sdT=sdT, sdY=sdY)
+def punti(N, dt, T0, rate, sdT, b, m, sdY):
+    X = [T0 + rate*j*dt + random.gauss(0, sdT) for j in range(N)]
+    return [X, [b + m*a + random.gauss(0, sdY) for a in X]]`};
+const PKEYS=Object.keys(PROG),PYCALL=`import json
+LAST = ""
+def _call(fn, a):
+    global LAST
+    try:
+        return json.dumps(globals()[fn](*json.loads(a))).replace("NaN", "null").replace("Infinity", "null")
+    except Exception as e:
+        LAST = fn + ": " + repr(e)
+        return "null"`;
+let PY=null,PYC=null,PYERR='';
+const fev=(ex,v)=>{try{return new Function(...Object.keys(v),'sqrt','exp','log','pi','return '+ex)(...Object.values(v),Math.sqrt,Math.exp,Math.log,Math.PI)}catch(e){return NaN}};
+const sum_=v=>v.reduce((a,b)=>a+b,0);
+const FB={ // equivalenti JavaScript dei programmi Python, usati se Python non si carica
+sigmaB:(ex,r)=>fev(ex,{r}),
+stats:(v,r,ex)=>{const n=v.length,m=n?sum_(v)/n:NaN,va=n>1?sum_(v.map(x=>(x-m)**2))/(n-1):NaN,s=Math.sqrt(va),sm=s/Math.sqrt(n),b=FB.sigmaB(ex,r);return{n,m,va,s,sm,b,st:n>1?Math.hypot(sm,b):b}},
+z:(a,sa,b,sb)=>Math.abs(a-b)/Math.hypot(sa,sb),
+chi2:(v,e,s)=>sum_(v.map(x=>((x-e)/s)**2)),
+wmean:(ms,ss)=>{const w=ss.map(s=>1/s**2),W=sum_(w),m=sum_(ms.map((x,i)=>w[i]*x))/W;return{m,s:Math.sqrt(1/W),c:sum_(ms.map((x,i)=>w[i]*(x-m)**2))}},
+n_necessari:(va,sb,t)=>t>sb?Math.ceil(va/(t*t-sb*sb)):NaN,
+n_pendenza:(sm,t)=>t>0?Math.ceil((sm/t)**2):NaN,
+fit:(x,y,sx,sy)=>{const n=x.length;let m=0,b,S0,Sx,Sy,Sxx,Sxy,D,w;for(let it=0;it<8;it++){w=1/(sy**2+(m*sx)**2);S0=w*n;Sx=w*sum_(x);Sy=w*sum_(y);Sxx=w*sum_(x.map(a=>a*a));Sxy=w*sum_(x.map((a,i)=>a*y[i]));D=S0*Sxx-Sx**2;m=(S0*Sxy-Sx*Sy)/D;b=(Sy-m*Sx)/S0}
+w=1/(sy**2+(m*sx)**2);const c=w*sum_(x.map((a,i)=>(y[i]-b-m*a)**2));return{m,sm:Math.sqrt(S0/D),b,sb:Math.sqrt(Sxx/D),cv:-Sx/D,c,nd:n-2,cr:c/(n-2)}},
+propaga:(ex,v)=>{const val={};for(const k in v)val[k]=v[k][0];const y0=fev(ex,val);let s2=0;for(const k in v){const[x,s]=v[k];if(s>0){const d=1e-6*Math.abs(x)+1e-9,p={...val},q={...val};p[k]+=d;q[k]-=d;s2+=((fev(ex,p)-fev(ex,q))/(2*d)*s)**2}}return[y0,Math.sqrt(s2)]},
+zero_assoluto:(b,sb,m,sm,cv)=>[-b/m,Math.sqrt(Math.max(0,(sb/m)**2+(b*sm/m**2)**2-2*b/m**3*cv))],
+previsione:(m,s,n,k,mo)=>{if(mo=='mm'&&k>=2){const z=Array.from({length:k},gauss),zb=sum_(z)/k,c=s*Math.sqrt(k/sum_(z.map(a=>(a-zb)**2)));return z.map(a=>m+c*(a-zb))}return Array.from({length:k},()=>m+s*Math.sqrt(1+1/n)*tt(n-1))},
+modello:(tt_,x,y,b,m)=>{const n=tt_.length,mt=sum_(tt_)/n,mx=sum_(x)/n,rate=sum_(tt_.map((u,i)=>(u-mt)*(x[i]-mx)))/sum_(tt_.map(u=>(u-mt)**2)),T0=mx-rate*(mt-tt_[0]);
+return{rate,T0,sdT:Math.sqrt(sum_(x.map((a,i)=>(a-T0-rate*(tt_[i]-tt_[0]))**2))/(n-2)),sdY:Math.sqrt(sum_(y.map((c,i)=>(c-b-m*x[i])**2))/(n-2))}},
+punti:(N,dt,T0,rate,sdT,b,m,sdY)=>{const X=Array.from({length:N},(_,j)=>T0+rate*j*dt+sdT*gauss());return[X,X.map(a=>b+m*a+sdY*gauss())]}};
+const PYF=(fn,...a)=>{if(PYC)return JSON.parse(PYC(fn,JSON.stringify(a)),(k,v)=>v===null?NaN:v);try{return FB[fn](...a)}catch(e){return NaN}};
+function loadProgs(){try{PY.runPython(PKEYS.map(k=>(S.py&&S.py[k])||PROG[k]).join('\n'));PYERR=''}catch(e){PYERR=String(e).split('\n').slice(-3).join(' ')}}
+async function initPy(){try{PY=await Promise.race([loadPyodide(),new Promise((_,r)=>setTimeout(()=>r('timeout 30 s'),30000))]);PY.runPython(PYCALL);PYC=PY.globals.get('_call');loadProgs()}catch(e){PYERR=String(e)}draw()}
+function ppane(){const L={kGL:'Pendenza attesa Gay-Lussac [kPa/K]',kCh:'Pendenza attesa Charles [cm3/K]',sB:'σB (r = risoluzione)',T0e:'T0 stimata (y0 = p0 o V0, m = pendenza)'};
+let h='<h2>Formule e programmi Python</h2><p class="mu">Tutti i calcoli (media, varianza, σ, fit, χ², Z, propagazione, previsioni) sono eseguiti da questi programmi, in Python nel browser (Pyodide). Modificali e premi “Applica e ricalcola”. Le espressioni qui sotto sono Python (sqrt, exp, log, pi; variabili = id delle grandezze).</p>';
+h+=`<p>Stato: ${PY?'<span class="ok">Python pronto</span>':PYERR?'<span class="ko">Python non disponibile ('+PYERR.slice(0,150)+')</span><br>L’app usa calcoli JavaScript equivalenti ai programmi originali; le modifiche ai programmi non hanno effetto finché Python non si carica.':'caricamento…'}${PY&&PYERR?' <span class="ko">'+PYERR+'</span>':''}</p>`;
+h+=Object.keys(L).map(k=>`<p>${L[k]}<br><input class="w" value="${S.F[k]}" onchange="S.F.${k}=this.value;save()"></p>`).join('');
+h+=PKEYS.map(k=>{const t=(S.py&&S.py[k])||PROG[k];return`<h3>${k}.py</h3><textarea rows="${Math.min(t.split('\n').length+1,22)}" spellcheck="false" onchange="S.py=S.py||{};S.py['${k}']=this.value;save()">${t.replace(/&/g,'&amp;').replace(/</g,'&lt;')}</textarea>`}).join('');
+const le=PY?PY.globals.get('LAST'):'';
+return h+`<p><button onclick="loadProgs();draw()">Applica e ricalcola</button> <button onclick="if(confirm('Ripristinare i programmi originali?')){delete S.py;save();loadProgs();draw()}">Ripristina originali</button></p>${le?'<p class="ko">Ultimo errore Python: '+le+'</p>':''}`}
+function draw(){nav();const m=$('#m');if(!PY&&!PYERR&&'qrs'.includes(tab)){m.innerHTML='<p>Caricamento di Python… (circa 10 MB la prima volta)</p>';return}m.innerHTML={g:guide,l:logb,q:qpane,r:rpane,t:tpane,s:spane,f:ppane}[tab]();if(!PYC&&PYERR&&'qrs'.includes(tab))m.innerHTML='<p class="mu">Python non disponibile: calcoli eseguiti in JavaScript con le stesse formule originali (vedi scheda Formule).</p>'+m.innerHTML}
+draw();initPy();
 </script></body></html>
